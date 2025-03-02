@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -7,7 +7,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# MODELOS
+# MODELO CLIENTE
 class Cliente(db.Model):
     __tablename__ = 'tb_clientes'
     pk_id_cliente = db.Column(db.Integer, primary_key=True)
@@ -16,48 +16,44 @@ class Cliente(db.Model):
     direccion = db.Column(db.Text)
     email = db.Column(db.String(40), unique=True)
 
-# RUTAS CRUD CLIENTES
+# RUTA PARA MOSTRAR FORMULARIO Y LISTA DE CLIENTES
 @app.route('/clientes', methods=['GET'])
 def get_clientes():
     clientes = Cliente.query.all()
-    return jsonify([{ 'id': c.pk_id_cliente, 'nombre': c.nombre, 'telefono': c.telefono, 'email': c.email } for c in clientes])
+    return render_template('clientes.html', clientes=clientes)
 
-@app.route('/clientes/<int:id>', methods=['GET'])
-def get_cliente(id):
-    cliente = Cliente.query.get(id)
-    if not cliente:
-        return jsonify({'error': 'Cliente no encontrado'}), 404
-    return jsonify({ 'id': cliente.pk_id_cliente, 'nombre': cliente.nombre, 'telefono': cliente.telefono, 'email': cliente.email })
-
+# RUTA PARA CREAR CLIENTE
 @app.route('/clientes', methods=['POST'])
 def create_cliente():
-    data = request.json
-    nuevo_cliente = Cliente(nombre=data['nombre'], telefono=data['telefono'], direccion=data.get('direccion'), email=data['email'])
+    nombre = request.form['nombre']
+    telefono = request.form['telefono']
+    direccion = request.form.get('direccion')
+    email = request.form['email']
+    nuevo_cliente = Cliente(nombre=nombre, telefono=telefono, direccion=direccion, email=email)
     db.session.add(nuevo_cliente)
     db.session.commit()
-    return jsonify({'message': 'Cliente creado con éxito'}), 201
+    return redirect(url_for('get_clientes'))
 
-@app.route('/clientes/<int:id>', methods=['PUT'])
+# RUTA PARA EDITAR CLIENTE
+@app.route('/clientes/<int:id>', methods=['GET', 'POST'])
 def update_cliente(id):
     cliente = Cliente.query.get(id)
-    if not cliente:
-        return jsonify({'error': 'Cliente no encontrado'}), 404
-    data = request.json
-    cliente.nombre = data.get('nombre', cliente.nombre)
-    cliente.telefono = data.get('telefono', cliente.telefono)
-    cliente.direccion = data.get('direccion', cliente.direccion)
-    cliente.email = data.get('email', cliente.email)
-    db.session.commit()
-    return jsonify({'message': 'Cliente actualizado con éxito'})
+    if request.method == 'POST':
+        cliente.nombre = request.form['nombre']
+        cliente.telefono = request.form['telefono']
+        cliente.direccion = request.form.get('direccion')
+        cliente.email = request.form['email']
+        db.session.commit()
+        return redirect(url_for('get_clientes'))
+    return render_template('editar_cliente.html', cliente=cliente)
 
-@app.route('/clientes/<int:id>', methods=['DELETE'])
+# RUTA PARA ELIMINAR CLIENTE
+@app.route('/clientes/<int:id>/delete', methods=['POST'])
 def delete_cliente(id):
     cliente = Cliente.query.get(id)
-    if not cliente:
-        return jsonify({'error': 'Cliente no encontrado'}), 404
     db.session.delete(cliente)
     db.session.commit()
-    return jsonify({'message': 'Cliente eliminado con éxito'})
+    return redirect(url_for('get_clientes'))
 
 if __name__ == '__main__':
     db.create_all()
